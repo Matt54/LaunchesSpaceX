@@ -1,5 +1,232 @@
-﻿<h3>Component1</h3>
+﻿@using Newtonsoft.Json
+@using System.Globalization;
+@inject HttpClient Http
+@using Telerik.DataSource;
+
+<div>
+    @if (request == null)
+    {
+        <h2 style="width:100%;text-align:center; margin-bottom: 20px;">Loading...</h2>
+        <div class="loader"></div>
+    }
+    else
+    {
+        <h2 style="width:100%;text-align:center; margin-bottom: 20px;">SpaceX Launches</h2>
+        <div style="margin:auto;">
+            <TelerikGrid Data="@request.results" Pageable="true" Sortable="false" Reorderable="false" Height="690px" RowHeight=100 PageSize="6">
+                <GridColumns>
+                    <GridColumn Width="105px" Field="@(nameof(Launch.patchURL))" Title="Link">
+                        <Template>
+                            @{
+                                var launch = context as Launch;
+                                <a href="@($"{launch.wikiURL}")" target="_blank">
+                                    <img width="80" height="80" class="rounded" src="@($"{launch.patchURL}")" />
+                                </a>
+                            }
+                        </Template>
+                    </GridColumn>
+                    <GridColumn Field="@(nameof(Launch.dateTime))" Title="Time Stamp" Width="200px" />
+                    <GridColumn Field="@(nameof(Launch.name))" Title="Rocket Name" Width="280px" />
+                    <GridColumn Field="@(nameof(Launch.success))" Title="Success" Width="80px" />
+                    <GridColumn Field="@(nameof(Launch.massText))" Title="Payload Rank" Width="120px" />
+                </GridColumns>
+            </TelerikGrid>
+        </div>
+    }
+</div>
+
 
 @code {
+
+    LaunchRequest request = null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        LaunchRequest launchRequest = new LaunchRequest(Http);
+        await launchRequest.GetPastLaunchesFromAPI();
+        launchRequest.rankMassForLanches();
+        launchRequest.results.Reverse();
+        request = launchRequest;
+    }
+
+    public class LaunchRequest
+    {
+        HttpClient Http { get; set; }
+        public List<Launch> results { get; set; }
+
+        public LaunchRequest(HttpClient _Http)
+        {
+            Http = _Http;
+            results = new List<Launch>();
+        }
+
+        public async Task GetLatestLaunchFromAPI()
+        {
+            HttpResponseMessage response = await Http.GetAsync("https://api.spacexdata.com/v4/launches/latest");
+            response.EnsureSuccessStatusCode();
+            string json = await response.Content.ReadAsStringAsync();
+            dynamic obj = JsonConvert.DeserializeObject(json);
+            string dateString = obj.date_utc;
+            Launch launch = new Launch(Convert.ToString(obj.name), DateTime.Parse(dateString), obj.success.ToObject<bool>());
+            await launch.addPayloads(obj.payloads.ToObject<List<String>>(), Http);
+            results.Add(launch);
+        }
+
+        public async Task GetPastLaunchesFromAPI()
+        {
+            HttpResponseMessage response = await Http.GetAsync("https://api.spacexdata.com/v4/launches/past");
+            response.EnsureSuccessStatusCode();
+            string json = await response.Content.ReadAsStringAsync();
+            dynamic obj = JsonConvert.DeserializeObject(json);
+
+            int numOfLaunches = Enumerable.Count(obj);
+
+            for (int i = 0; i < numOfLaunches; i++)
+            {
+                string dateString = obj[i].date_utc;
+                Launch launch = new Launch(Convert.ToString(obj[i].name), DateTime.Parse(dateString), obj[i].success.ToObject<bool>());
+                await launch.addPayloads(obj[i].payloads.ToObject<List<String>>(), Http);
+                launch.patchURL = obj[i].links.patch.small;
+                launch.wikiURL = obj[i].links.wikipedia;
+                results.Add(launch);
+            }
+
+        }
+
+        public void rankMassForLanches()
+        {
+            var byMass = results.OrderByDescending(m => m.mass).ToList();
+
+            foreach (var launch in results)
+            {
+                if (launch.mass != 0)
+                {
+                    launch.MassRank = byMass.IndexOf(launch) + 1;
+                }
+                else
+                {
+                    launch.MassRank = -1;
+                }
+            }
+        }
+
+        public string getLaunchString()
+        {
+            return results[0].getLaunchTimeString() + "; " + results[0].name + "; " + results[0].success + "; " + results[0].mass;
+        }
+
+    }
+
+    public class Launch
+    {
+        public string name { get; set; }
+        public DateTime dateTime { get; set; }
+        public bool success { get; set; }
+        public List<string> payloadIDs { get; set; }
+        public int mass { get; set; }
+        public string patchURL { get; set; }
+        public string wikiURL { get; set; }
+
+        private int massRank;
+        public int MassRank
+        {
+            get { return massRank; }
+            set
+            {
+                if (value == -1)
+                {
+                    massText = "N/A";
+                }
+                else
+                {
+                    massText = value.ToString();
+                }
+                massRank = value;
+            }
+        }
+
+        public string massText { get; set; }
+
+        public Launch()
+        {
+            payloadIDs = new List<string>();
+        }
+
+        public Launch(string _name, DateTime dateTimeUTC, bool _success)
+        {
+            name = _name;
+            dateTime = dateTimeUTC.AddHours(-5);
+            success = _success;
+            payloadIDs = new List<string>();
+            patchURL = "https://images2.imgbox.com/a7/b4/bcMrHMey_o.png";
+        }
+
+        //TODO: make this accept TimeZoneInfo and return the offset
+        public string getLaunchTimeString(bool isCentralTime = true)
+        {
+            DateTime myDateTime = dateTime;
+            if (isCentralTime)
+            {
+                myDateTime = dateTime.AddHours(-5);
+            }
+
+            return myDateTime.ToLongDateString() + " " + myDateTime.ToShortTimeString();
+        }
+
+        public async Task addPayload(string payloadID, HttpClient Http)
+        {
+            payloadIDs.Add(payloadID);
+            mass += await getMassForPayloadID(payloadID, Http);
+        }
+
+        private async Task<int> getMassForPayloadID(string payloadID, HttpClient Http)
+        {
+            HttpResponseMessage response2 = await Http.GetAsync("https://api.spacexdata.com/v4/payloads/" + payloadID);
+            response2.EnsureSuccessStatusCode();
+            string json2 = await response2.Content.ReadAsStringAsync();
+            dynamic obj2 = JsonConvert.DeserializeObject(json2);
+
+            if (obj2.mass_kg == null)
+            {
+                return 0;
+            }
+            else
+            {
+                return obj2.mass_kg;
+            }
+        }
+
+        public async Task addPayloads(List<String> PayloadIDs, HttpClient Http)
+        {
+            foreach (string payload in PayloadIDs)
+            {
+                await addPayload(payload, Http);
+            }
+        }
+
+        public string getLaunchString()
+        {
+            if (MassRank != -1)
+            {
+                return getLaunchTimeString() + "; " + name + "; " + success + "; " + mass + "; " + MassRank;
+            }
+            else
+            {
+                return getLaunchTimeString() + "; " + name + "; " + success + "; " + mass + "; " + "N/A";
+            }
+        }
+
+        //Just for testing
+        public string getPayloadIDs()
+        {
+            string payloadString = "";
+            foreach (string payload in payloadIDs)
+            {
+                payloadString += payload;
+            }
+            return payloadString;
+        }
+
+    }
 
 }
