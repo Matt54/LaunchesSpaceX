@@ -12,23 +12,59 @@
     else
     {
         <h2 style="width:100%;text-align:center; margin-bottom: 20px;">SpaceX Launches</h2>
-        <div style="margin:auto;">
+        <div  style="margin:auto;">
             <TelerikGrid Data="@request.results" Pageable="true" Sortable="false" Reorderable="false" Height="690px" RowHeight=100 PageSize="6">
                 <GridColumns>
+
                     <GridColumn Width="105px" Field="@(nameof(Launch.patchURL))" Title="Link">
                         <Template>
-                            @{
-                                var launch = context as Launch;
-                                <a href="@($"{launch.wikiURL}")" target="_blank">
-                                    <img width="80" height="80" class="rounded" src="@($"{launch.patchURL}")" />
-                                </a>
+                            @{ var launch = context as Launch;
+                            <a href="@($"{launch.wikiURL}")" target="_blank">
+                                <img style="display: block; margin:auto;" width="80" height="80" class="rounded" src="@($"{launch.patchURL}")" />
+                            </a>
                             }
                         </Template>
+                        <HeaderTemplate>
+                            <div style="text-align:center; font-weight:bolder">Link</div>
+                        </HeaderTemplate>
                     </GridColumn>
-                    <GridColumn Field="@(nameof(Launch.dateTime))" Title="Time Stamp" Width="200px" />
-                    <GridColumn Field="@(nameof(Launch.name))" Title="Rocket Name" Width="280px" />
-                    <GridColumn Field="@(nameof(Launch.success))" Title="Success" Width="80px" />
-                    <GridColumn Field="@(nameof(Launch.massText))" Title="Payload Rank" Width="120px" />
+
+                    <GridColumn Field="@(nameof(Launch.dateTime))" Title="Date and Time" Width="200px">
+                        <Template>
+                            <div style="text-align:center;"> @((context as Launch).dateTime) </div>
+                        </Template>
+                        <HeaderTemplate>
+                            <div style="text-align:center; font-weight:bolder">Date and Time</div>
+                        </HeaderTemplate>
+                    </GridColumn>
+
+                    <GridColumn Field="@(nameof(Launch.name))" Title="Mission Name" Width="280px">
+                        <Template>
+                            <div style="text-align:center;"> @((context as Launch).name) </div>
+                        </Template>
+                        <HeaderTemplate>
+                            <div style="text-align:center; font-weight:bolder">Mission Name</div>
+                        </HeaderTemplate>
+                    </GridColumn>
+
+                    <GridColumn Field="@(nameof(Launch.success))" Title="Success" Width="80px">
+                        <Template>
+                            <div style="text-align:center;"> @((context as Launch).success) </div>
+                        </Template>
+                        <HeaderTemplate>
+                            <div style="text-align:center; font-weight:bolder">Success</div>
+                        </HeaderTemplate>
+                    </GridColumn>
+
+                    <GridColumn Field="@(nameof(Launch.massText))" Title="Payload Rank" Width="120px">
+                        <Template>
+                            <div style="text-align:center;"> @((context as Launch).massText) </div>
+                        </Template>
+                        <HeaderTemplate>
+                            <div style="text-align:center; font-weight:bolder">Payload Rank</div>
+                        </HeaderTemplate>
+                    </GridColumn>
+
                 </GridColumns>
             </TelerikGrid>
         </div>

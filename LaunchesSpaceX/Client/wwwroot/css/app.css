@@ -1,5 +1,14 @@
 ﻿@import url('open-iconic/font/css/open-iconic-bootstrap.min.css');
 
+.grid-header {
+    text-align: center;
+    font-weight: bolder;
+}
+
+.k-grid-header {
+    text-align: center;
+}
+
 .loader {
     border: 16px solid #f1f1f1;
     border-top: 16px solid #551a8b;
