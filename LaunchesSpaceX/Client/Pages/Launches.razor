@@ -13,52 +13,108 @@
     {
         <h2 style="width:100%;text-align:center; margin-bottom: 20px;">SpaceX Launches</h2>
         <div  style="margin:auto;">
-            <TelerikGrid Data="@request.results" Pageable="true" Sortable="false" Reorderable="false" Height="690px" RowHeight=100 PageSize="6">
+            <TelerikGrid Data="@request.Results" Pageable="true" Sortable="false" Reorderable="false" Height="660px" RowHeight=90 PageSize="20">
                 <GridColumns>
 
-                    <GridColumn Width="105px" Field="@(nameof(Launch.patchURL))" Title="Link">
+                    <GridColumn Width="105px" Field="@(nameof(Launch.PatchURL))" Title="Wiki Link">
                         <Template>
-                            @{ var launch = context as Launch;
-                            <a href="@($"{launch.wikiURL}")" target="_blank">
-                                <img style="display: block; margin:auto;" width="80" height="80" class="rounded" src="@($"{launch.patchURL}")" />
-                            </a>
+                            @{
+                                var launch = context as Launch;
+                                if (String.IsNullOrEmpty(launch.WikiURL))
+                                {
+                                    <div style="text-align:center;"> No Link Found</div>
+                                }
+                                else if (String.IsNullOrEmpty(launch.PatchURL))
+                                {
+                                    <a href="@($"{launch.WikiURL}")" target="_blank">
+                                        <div style="text-align:center;"> No Patch Found</div>
+                                    </a>
+                                }
+                                else
+                                {
+                                    <a href="@($"{launch.WikiURL}")" target="_blank">
+                                        <img style="display: block; margin:auto;" width="80" height="80" class="rounded" src="@($"{launch.PatchURL}")" />
+                                    </a>
+                                }
                             }
                         </Template>
                         <HeaderTemplate>
-                            <div style="text-align:center; font-weight:bolder">Link</div>
+                            <div style="text-align:center; font-weight:bolder">Wiki Link</div>
                         </HeaderTemplate>
                     </GridColumn>
 
-                    <GridColumn Field="@(nameof(Launch.dateTime))" Title="Date and Time" Width="200px">
+                    <GridColumn Field="@(nameof(Launch.DateTime))" Title="Date and Time" Width="200px">
                         <Template>
-                            <div style="text-align:center;"> @((context as Launch).dateTime) </div>
+                            <div style="text-align:center;"> @((context as Launch).DateTime) </div>
                         </Template>
                         <HeaderTemplate>
-                            <div style="text-align:center; font-weight:bolder">Date and Time</div>
+                            <div style="text-align:center; font-weight:bolder">Date and Time (CST)</div>
                         </HeaderTemplate>
                     </GridColumn>
 
-                    <GridColumn Field="@(nameof(Launch.name))" Title="Mission Name" Width="280px">
+                    <GridColumn Field="@(nameof(Launch.Name))" Title="Launch Name" Width="280px">
                         <Template>
-                            <div style="text-align:center;"> @((context as Launch).name) </div>
+                            <div style="text-align:center;"> @((context as Launch).Name) </div>
                         </Template>
                         <HeaderTemplate>
-                            <div style="text-align:center; font-weight:bolder">Mission Name</div>
+                            <div style="text-align:center; font-weight:bolder">Launch Name</div>
                         </HeaderTemplate>
                     </GridColumn>
 
-                    <GridColumn Field="@(nameof(Launch.success))" Title="Success" Width="80px">
+                    <GridColumn Field="@(nameof(Launch.WasSuccessful))" Title="Success?" Width="100px">
                         <Template>
-                            <div style="text-align:center;"> @((context as Launch).success) </div>
+                            @{
+                                var launch = context as Launch;
+
+                                if (launch.WasSuccessful)
+                                {
+                                    <span style="display: table; margin: 0 auto;" class="oi oi-thumb-up" aria-hidden="true"></span>
+                                }
+                                else
+                                {
+                                    <span style="display: table; margin: 0 auto;" class="oi oi-thumb-down" aria-hidden="true"></span>
+                                }
+                            }
                         </Template>
                         <HeaderTemplate>
-                            <div style="text-align:center; font-weight:bolder">Success</div>
+                            <div style="text-align:center; font-weight:bolder">Success?</div>
                         </HeaderTemplate>
                     </GridColumn>
 
-                    <GridColumn Field="@(nameof(Launch.massText))" Title="Payload Rank" Width="120px">
+                    <GridColumn Field="@(nameof(Launch.Mass))" Title="Mass (kg)" Width="120px">
                         <Template>
-                            <div style="text-align:center;"> @((context as Launch).massText) </div>
+                            @{
+                                var launch = context as Launch;
+
+                                if (launch.Mass == 0)
+                                {
+                                    <div style="text-align:center;"> (Null) </div>
+                                }
+                                else
+                                {
+                                    <div style="text-align:center;"> @((context as Launch).Mass) </div>
+                                }
+                            }
+                        </Template>
+                        <HeaderTemplate>
+                            <div style="text-align:center; font-weight:bolder">Mass (kg)</div>
+                        </HeaderTemplate>
+                    </GridColumn>
+
+                    <GridColumn Field="@(nameof(Launch.MassRank))" Title="Payload Rank" Width="120px">
+                        <Template>
+                            @{
+                                var launch = context as Launch;
+
+                                if (launch.Mass == 0)
+                                {
+                                    <div style="text-align:center;"> N/A </div>
+                                }
+                                else
+                                {
+                                    <div style="text-align:center;"> @((context as Launch).MassRank) </div>
+                                }
+                            }
                         </Template>
                         <HeaderTemplate>
                             <div style="text-align:center; font-weight:bolder">Payload Rank</div>
@@ -74,26 +130,32 @@
 
 @code {
 
+    // Data model that binds to the grid view - holds the information about each mission
     LaunchRequest request = null;
 
+    // Called when page is initialized
     protected override async Task OnInitializedAsync()
     {
         LaunchRequest launchRequest = new LaunchRequest(Http);
+
+        //get all the launches
         await launchRequest.GetPastLaunchesFromAPI();
-        launchRequest.rankMassForLanches();
-        launchRequest.results.Reverse();
+
         request = launchRequest;
     }
 
+    /// <summary>
+    /// Data model that makes API call and stores the information about each launch
+    /// </summary>
     public class LaunchRequest
     {
         HttpClient Http { get; set; }
-        public List<Launch> results { get; set; }
+        public List<Launch> Results { get; set; }
 
         public LaunchRequest(HttpClient _Http)
         {
             Http = _Http;
-            results = new List<Launch>();
+            Results = new List<Launch>();
         }
 
         public async Task GetLatestLaunchFromAPI()
@@ -104,163 +166,152 @@
             dynamic obj = JsonConvert.DeserializeObject(json);
             string dateString = obj.date_utc;
             Launch launch = new Launch(Convert.ToString(obj.name), DateTime.Parse(dateString), obj.success.ToObject<bool>());
-            await launch.addPayloads(obj.payloads.ToObject<List<String>>(), Http);
-            results.Add(launch);
+            await launch.AddPayloads(obj.payloads.ToObject<List<String>>(), Http);
+            Results.Add(launch);
         }
 
+        /// <summary>
+        /// Makes HTTP request to SpaceX API to get information about each of their past launches. Stores results in list of type Launch.
+        /// </summary>
         public async Task GetPastLaunchesFromAPI()
         {
+            // make API call to get the json data
             HttpResponseMessage response = await Http.GetAsync("https://api.spacexdata.com/v4/launches/past");
             response.EnsureSuccessStatusCode();
             string json = await response.Content.ReadAsStringAsync();
             dynamic obj = JsonConvert.DeserializeObject(json);
 
+            // get the number of launches returned
             int numOfLaunches = Enumerable.Count(obj);
 
+            // create a new Launch object for each returned launch and add it to the list of launches
             for (int i = 0; i < numOfLaunches; i++)
             {
                 string dateString = obj[i].date_utc;
                 Launch launch = new Launch(Convert.ToString(obj[i].name), DateTime.Parse(dateString), obj[i].success.ToObject<bool>());
-                await launch.addPayloads(obj[i].payloads.ToObject<List<String>>(), Http);
-                launch.patchURL = obj[i].links.patch.small;
-                launch.wikiURL = obj[i].links.wikipedia;
-                results.Add(launch);
+                await launch.AddPayloads(obj[i].payloads.ToObject<List<String>>(), Http);
+                launch.PatchURL = obj[i].links.patch.small;
+                launch.WikiURL = obj[i].links.wikipedia;
+                Results.Add(launch);
             }
 
+            // Update the payload mass rankings for the launches
+            RankMassForLanches();
+
+            // Put the list in reverse chronological order
+            Results.Reverse();
         }
 
-        public void rankMassForLanches()
+        /// <summary>
+        /// Updates each launch's payload mass ranking (heaviest payload being rank 1)
+        /// </summary>
+        public void RankMassForLanches()
         {
-            var byMass = results.OrderByDescending(m => m.mass).ToList();
-
-            foreach (var launch in results)
+            for (int i = 0; i < Results.Count; i++)
             {
-                if (launch.mass != 0)
+                int currentRank = 1;
+                if (Results[i].Mass != 0)
                 {
-                    launch.MassRank = byMass.IndexOf(launch) + 1;
+                    for (int j = 0; j < Results.Count; j++)
+                    {
+                        if (Results[i].Mass < Results[j].Mass && i != j)
+                        {
+                            currentRank += 1;
+                        }
+                    }
+                    Results[i].MassRank = currentRank;
                 }
                 else
                 {
-                    launch.MassRank = -1;
+                    Results[i].MassRank = -1;
                 }
             }
-        }
-
-        public string getLaunchString()
-        {
-            return results[0].getLaunchTimeString() + "; " + results[0].name + "; " + results[0].success + "; " + results[0].mass;
         }
 
     }
 
+    /// <summary>
+    /// Stores all necessary information about a SpaceX launch
+    /// </summary>
     public class Launch
     {
-        public string name { get; set; }
-        public DateTime dateTime { get; set; }
-        public bool success { get; set; }
-        public List<string> payloadIDs { get; set; }
-        public int mass { get; set; }
-        public string patchURL { get; set; }
-        public string wikiURL { get; set; }
+        public string Name { get; set; }
+        public DateTime DateTime { get; set; }
+        public bool WasSuccessful { get; set; }
 
-        private int massRank;
-        public int MassRank
-        {
-            get { return massRank; }
-            set
-            {
-                if (value == -1)
-                {
-                    massText = "N/A";
-                }
-                else
-                {
-                    massText = value.ToString();
-                }
-                massRank = value;
-            }
-        }
+        /// <summary>
+        /// A list of unique payload identifiers that are associated with a specific mass. These combine to realize the payload mass.
+        /// </summary>
+        public List<string> PayloadIDs { get; set; }
 
-        public string massText { get; set; }
+        /// <summary>
+        /// Payload mass in kilograms
+        /// </summary>
+        public int Mass { get; set; }
 
-        public Launch()
-        {
-            payloadIDs = new List<string>();
-        }
+        /// <summary>
+        /// Image link for the launch patch
+        /// </summary>
+        public string PatchURL { get; set; }
+
+        /// <summary>
+        /// Wikipedia link for the launch
+        /// </summary>
+        public string WikiURL { get; set; }
+
+        /// <summary>
+        /// The launch's payload mass ranking (heaviest payload being rank 1)
+        /// </summary>
+        public int MassRank{ get; set; }
 
         public Launch(string _name, DateTime dateTimeUTC, bool _success)
         {
-            name = _name;
-            dateTime = dateTimeUTC.AddHours(-5);
-            success = _success;
-            payloadIDs = new List<string>();
-            patchURL = "https://images2.imgbox.com/a7/b4/bcMrHMey_o.png";
+            Name = _name;
+            DateTime = dateTimeUTC.AddHours(-5);
+            WasSuccessful = _success;
+            PayloadIDs = new List<string>();
+            PatchURL = "https://images2.imgbox.com/a7/b4/bcMrHMey_o.png";
         }
 
-        //TODO: make this accept TimeZoneInfo and return the offset
-        public string getLaunchTimeString(bool isCentralTime = true)
+        /// <summary>
+        /// Adds all the Payload IDs to the list of PayloadIDs and gets the mass for each
+        /// </summary>
+        public async Task AddPayloads(List<String> PayloadIDs, HttpClient Http)
         {
-            DateTime myDateTime = dateTime;
-            if (isCentralTime)
+            foreach (string payload in PayloadIDs)
             {
-                myDateTime = dateTime.AddHours(-5);
+                await AddPayload(payload, Http);
             }
-
-            return myDateTime.ToLongDateString() + " " + myDateTime.ToShortTimeString();
         }
 
-        public async Task addPayload(string payloadID, HttpClient Http)
+        /// <summary>
+        /// Add a Payload ID to the list of Payload IDs and get the mass the for ID
+        /// </summary>
+        public async Task AddPayload(string payloadID, HttpClient Http)
         {
-            payloadIDs.Add(payloadID);
-            mass += await getMassForPayloadID(payloadID, Http);
+            PayloadIDs.Add(payloadID);
+            Mass += await GetMassForPayloadID(payloadID, Http);
         }
 
-        private async Task<int> getMassForPayloadID(string payloadID, HttpClient Http)
+        /// <summary>
+        /// Makes call to SpaceX API to get the mass for a Payload ID
+        /// </summary>
+        /// <returns>Mass for Payload ID in kilograms</returns>
+        private async Task<int> GetMassForPayloadID(string payloadID, HttpClient Http)
         {
-            HttpResponseMessage response2 = await Http.GetAsync("https://api.spacexdata.com/v4/payloads/" + payloadID);
-            response2.EnsureSuccessStatusCode();
-            string json2 = await response2.Content.ReadAsStringAsync();
-            dynamic obj2 = JsonConvert.DeserializeObject(json2);
+            HttpResponseMessage response = await Http.GetAsync("https://api.spacexdata.com/v4/payloads/" + payloadID);
+            response.EnsureSuccessStatusCode();
+            string json = await response.Content.ReadAsStringAsync();
+            dynamic obj = JsonConvert.DeserializeObject(json);
 
-            if (obj2.mass_kg == null)
+            if (obj.mass_kg == null)
             {
                 return 0;
             }
             else
             {
-                return obj2.mass_kg;
+                return obj.mass_kg;
             }
-        }
-
-        public async Task addPayloads(List<String> PayloadIDs, HttpClient Http)
-        {
-            foreach (string payload in PayloadIDs)
-            {
-                await addPayload(payload, Http);
-            }
-        }
-
-        public string getLaunchString()
-        {
-            if (MassRank != -1)
-            {
-                return getLaunchTimeString() + "; " + name + "; " + success + "; " + mass + "; " + MassRank;
-            }
-            else
-            {
-                return getLaunchTimeString() + "; " + name + "; " + success + "; " + mass + "; " + "N/A";
-            }
-        }
-
-        //Just for testing
-        public string getPayloadIDs()
-        {
-            string payloadString = "";
-            foreach (string payload in payloadIDs)
-            {
-                payloadString += payload;
-            }
-            return payloadString;
         }
 
     }
